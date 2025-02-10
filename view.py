@@ -206,7 +206,7 @@ def editar_usuario(id_usuario):
     cur.execute("UPDATE USUARIOS SET NOME = ?, EMAIL = ?, SENHA = ? WHERE ID_USUARIO = ?",
                 (nome, email, senha, id_usuario))
     con.commit()
-    con.close()
+    cur.close()
 
     return jsonify({
         'message': 'Usuário editado com sucesso!',
