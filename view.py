@@ -1,5 +1,6 @@
 from flask import Flask, jsonify, request
 from main import app, con
+from flask_bcrypt import generate_password_hash, check_password_hash
 
 
 @app.route('/livros', methods=['GET'])
@@ -148,6 +149,8 @@ def inserir_usuario():
     if cur.fetchone():
         return jsonify(mensagem='Este e-mail já possui uma conta')
 
+    senha = generate_password_hash(senha).decode("utf-8")
+
     cur.execute("INSERT INTO USUARIOS(NOME, EMAIL, SENHA) VALUES (?, ?, ?)", (nome, email, senha))
 
     con.commit()
@@ -244,10 +247,13 @@ def efetuar_login():
     senha = data.get('senha')
 
     cur = con.cursor()
-    cur.execute('SELECT ID_USUARIO FROM USUARIOS WHERE EMAIL = ? AND SENHA = ?', (email, senha,))
-    usuario = cur.fetchone()
 
-    if usuario:
+    # pegar a senha criptografada baseada no email digitado
+    cur.execute('SELECT SENHA FROM USUARIOS WHERE EMAIL = ?', (email,))
+    senha_criptografada = cur.fetchone()
+    senha_criptografada = senha_criptografada[0]
+
+    if check_password_hash(senha_criptografada, senha):
         return jsonify(mensagem='Login efetuado com sucesso')
 
     return jsonify(mensagem="Login falhado, usuário ou senha incorretos")
