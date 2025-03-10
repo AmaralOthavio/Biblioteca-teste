@@ -1,7 +1,9 @@
-from flask import Flask, jsonify, request
-from main import app, con
-from flask_bcrypt import generate_password_hash, check_password_hash
 import jwt
+import os
+from flask import jsonify, request, send_file
+from flask_bcrypt import generate_password_hash, check_password_hash
+from fpdf import FPDF
+from main import app, con
 
 senha_secreta = app.config['SECRET_KEY']
 
@@ -35,6 +37,37 @@ def livro():
     return jsonify(livros=livros_dic, mensagem='Lista de livros')
 
 
+@app.route('/livros/relatorio', methods=['GET'])
+def gerar_relatorio():
+    cursor = con.cursor()
+    cursor.execute("SELECT id_livro, titulo, autor, ano_publicacao FROM livros")
+    livros = cursor.fetchall()
+    cursor.close()
+
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.add_page()
+    pdf.set_font("Arial", style='B', size=16)
+    pdf.cell(200, 10, "Relatorio de Livros", ln=True, align='C')
+    pdf.ln(5)  # Espaço entre o título e a linha
+    pdf.line(10, pdf.get_y(), 200, pdf.get_y())  # Linha abaixo do título
+    pdf.ln(5)  # Espaço após a linha
+
+    pdf.set_font("Arial", size=12)
+    for livro in livros:
+        pdf.cell(200, 10, f"ID: {livro[0]} - {livro[1]} - {livro[2]} - {livro[3]}", ln=True)
+
+    contador_livros = len(livros)
+    pdf.ln(10)  # Espaço antes do contador
+    pdf.set_font("Arial", style='B', size=12)
+    pdf.cell(200, 10, f"Total de livros cadastrados: {contador_livros}", ln=True, align='C')
+
+    pdf_path = "relatorio_livros.pdf"
+    pdf.output(pdf_path)
+
+    return send_file(pdf_path, as_attachment=True, mimetype='application/pdf')
+
+
 @app.route('/livro', methods=['POST'])
 def livro_post():
 
@@ -50,8 +83,9 @@ def livro_post():
     except jwt.InvalidTokenError:
         return jsonify({'mensagem': 'Token inválido'}), 401
 
-    data = request.get_json()
+    data = request.form.to_dict()
 
+    imagem = request.files.get('imagem')  # Arquivo enviado
     titulo = data.get('titulo')
     autor = data.get('autor')
     ano_publicacao = data.get('ano_publicacao')
@@ -62,14 +96,18 @@ def livro_post():
     if cur.fetchone():
         return jsonify('Livro já cadastrado')
 
-    cur.execute("INSERT INTO LIVROS(TITULO,AUTOR, ANO_PUBLICACAO) VALUES (?, ?, ?)", (titulo, autor, ano_publicacao))
+    cur.execute("INSERT INTO LIVROS (TITULO,AUTOR, ANO_PUBLICACAO) VALUES (?, ?, ?) RETURNING ID_LIVRO", (titulo, autor, ano_publicacao))
+    livro_id = cur.fetchone()[0]
 
     con.commit()
     cur.close()
 
-    token = request.headers.get("Authorization")
-    if not token:
-        return jsonify({"mensagem": "Token de autenticação necessário"}), 401
+    if imagem:
+        nome_imagem = f"{livro_id}.jpeg"
+        pasta_destino = os.path.join(app.config['UPLOAD_FOLDER'], "Livros")
+        os.makedirs(pasta_destino, exist_ok=True)
+        imagem_path = os.path.join(pasta_destino, nome_imagem)
+        imagem.save(imagem_path)
 
     return jsonify({
         'mensagem': 'Livro cadastrado com sucesso',
