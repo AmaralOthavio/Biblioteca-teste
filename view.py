@@ -1,6 +1,22 @@
 from flask import Flask, jsonify, request
 from main import app, con
 from flask_bcrypt import generate_password_hash, check_password_hash
+import jwt
+
+senha_secreta = app.config['SECRET_KEY']
+
+
+def generate_token(user_id):
+    payload = {"id_usuario": user_id}
+    token = jwt.encode(payload, senha_secreta, algorithm='HS256')
+    return token
+
+
+def remover_bearer(token):
+    if token.startswith("Bearer "):
+        return token[len("Bearer "):]
+    else:
+        return token
 
 
 @app.route('/livros', methods=['GET'])
@@ -21,7 +37,21 @@ def livro():
 
 @app.route('/livro', methods=['POST'])
 def livro_post():
+
+    token = request.headers.get('Authorization')
+    if not token:
+        return jsonify({'mensagem': 'Token de autenticação necessário'}), 401
+    token = remover_bearer(token)
+    try:
+        payload = jwt.decode(token, senha_secreta, algorithms=['HS256'])
+        id_usuario = payload['id_usuario']
+    except jwt.ExpiredSignatureError:
+        return jsonify({'mensagem': 'Token expirado'}), 401
+    except jwt.InvalidTokenError:
+        return jsonify({'mensagem': 'Token inválido'}), 401
+
     data = request.get_json()
+
     titulo = data.get('titulo')
     autor = data.get('autor')
     ano_publicacao = data.get('ano_publicacao')
@@ -36,6 +66,10 @@ def livro_post():
 
     con.commit()
     cur.close()
+
+    token = request.headers.get("Authorization")
+    if not token:
+        return jsonify({"mensagem": "Token de autenticação necessário"}), 401
 
     return jsonify({
         'mensagem': 'Livro cadastrado com sucesso',
@@ -249,11 +283,13 @@ def efetuar_login():
     cur = con.cursor()
 
     # pegar a senha criptografada baseada no email digitado
-    cur.execute('SELECT SENHA FROM USUARIOS WHERE EMAIL = ?', (email,))
-    senha_criptografada = cur.fetchone()
-    senha_criptografada = senha_criptografada[0]
+    cur.execute('SELECT SENHA, ID_USUARIO FROM USUARIOS WHERE EMAIL = ?', (email,))
+    resultado = cur.fetchone()
+    senha_criptografada = resultado[0]
+    id_usuario = resultado[1]
 
     if check_password_hash(senha_criptografada, senha):
-        return jsonify(mensagem='Login efetuado com sucesso')
-
+        token = generate_token(id_usuario)
+        return jsonify({"mensagem": 'Login efetuado com sucesso', "token": token}), 200
+    
     return jsonify(mensagem="Login falhado, usuário ou senha incorretos")

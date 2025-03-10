@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+</head>
+<body class="container">
+
+    <form id="formCadastroUsuario">
+        <input placeholder="Nome Completo" type="text" name="nome_completo" />
+        <input placeholder="Email" type="email" name="email" />
+        <input placeholder="Senha" type="password" name="senha_hash">
+
+        <button type="submit">Cadastar</button>
+    </form>
+
+    <script>
+        $("#formCadastroUsuario").on("submit", function(e) {
+
+            // Faz com que não atualiza a página
+            e.preventDefault();
+
+            // Captura tudo o que o usuario preencheu 
+            let dados = new FormData(this);
+
+            // Repassa os dados para OBJETO
+            let envia = {
+                nome_completo: dados.get("nome_completo"),
+                email: dados.get("email"),
+                senha_hash: dados.get("senha_hash"),
+                tipo_usuario: 3
+            }
+
+            // Transforma o Objeto JSON em um STRING
+            envia = JSON.stringify(envia)
+
+            // Envia as informações para a API
+            $.ajax({
+                // Metodo HTTP da API
+                method: "post", 
+
+                // URL da API
+                url: "http://192.168.1.126:5000/user",
+
+                // Envia os dados do formulario
+                data: envia,
+
+                // Informa que deve ser retornado um JSON
+                contentType: "application/json",
+
+                // Metodo executado quando da certo a requisição
+                success: function(retorno) {
+                    alert("DEU CERTO!!!")
+                    console.log(retorno)
+                },
+
+                // Caso de algum erro executa essa função
+                error: function(retorno) {
+                    alert("DEU RUIM")
+                    console.log(retorno)
+                }
+            })
+        })
+    </script>
+</body>
+</html>
