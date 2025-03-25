@@ -3,6 +3,7 @@ import os
 from flask import jsonify, request, send_file
 from flask_bcrypt import generate_password_hash, check_password_hash
 from fpdf import FPDF
+from flask_mail import Mail, Message
 from main import app, con
 
 senha_secreta = app.config['SECRET_KEY']
@@ -19,6 +20,20 @@ def remover_bearer(token):
         return token[len("Bearer "):]
     else:
         return token
+
+
+def enviar_email(destinatario, assunto, corpo):
+    msg = Message(assunto, recipients=[destinatario])
+    msg.body = corpo
+    # Definindo o cabeçalho Reply-To para o endereço noreply
+    msg.reply_to = 'noreply@dominio.com'  # Não aceitar respostas
+
+    try:
+        mail.send(msg)
+        return "E-mail enviado com sucesso!"
+    except Exception as e:
+        print(e)
+        return f"Erro ao enviar e-mail: {str(e)}"
 
 
 @app.route('/livros', methods=['GET'])
@@ -147,6 +162,23 @@ def livro_put(id_livro):
             'ano_publicacao': ano_publicacao
         }
     })
+
+
+@app.route('/enviar_email', methods=['GET'])
+def enviar_emails():
+    cur = con.cursor()
+    cur.execute("SELECT ID_USUARIO, NOME, EMAIL, SENHA FROM USUARIOS WHERE USUARIOS.EMAIL = 'othaviohma2014@gmail.com'")
+    usuario = cur.fetchone()
+
+    # Enviar e-mail para todos os usuários ativos
+    nome = usuario[1]
+    email = usuario[2]
+    print(f"Nome: {nome}, email: {email}")
+    assunto = 'Olá, ' + nome
+    corpo = f'Olá {nome},\n\nEste é um e-mail de exemplo enviado via Flask.'
+    enviar_email(email, assunto, corpo)
+
+    return jsonify({"message": "E-mail enviados com sucesso!"})
 
 
 @app.route('/livro/<int:id_livro>', methods=['DELETE'])
